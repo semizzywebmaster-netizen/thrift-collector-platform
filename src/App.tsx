@@ -70,7 +70,7 @@ export default function App() {
       <aside className={`sidebar ${menuOpen ? 'sidebar-open' : ''}`} aria-label="Main navigation">
         <div className="brand">
           <div className="brand-mark"><Wallet size={21} strokeWidth={2.4} /></div>
-          <div><strong>Thrift<span>Collect</span></strong><small>TRUSTED GROUP SAVINGS</small></div>
+          <div><strong>Thrift<span>Collect</span></strong><small>SEMIZZY THRIFT • GROUP SAVINGS</small></div>
           <button className="icon-button mobile-close" aria-label="Close menu" onClick={() => setMenuOpen(false)}><X size={20} /></button>
         </div>
         <div className="workspace-label">{page === 'admin' ? 'PLATFORM ADMIN' : 'YOUR WORKSPACE'}</div>
