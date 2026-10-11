@@ -31,6 +31,8 @@ Route::get('/', function () use ($serveDashboardApp) {
 
 Route::get('/dashboard', $serveDashboardApp);
 Route::get('/admin', $serveDashboardApp);
+Route::get('/login', $serveDashboardApp);
+Route::get('/register', $serveDashboardApp);
 
 Route::view('/reset-password', 'auth.reset-password');
 Route::view('/accept-business-invitation', 'auth.accept-business-invitation');
