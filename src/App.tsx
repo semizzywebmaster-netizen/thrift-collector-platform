@@ -152,7 +152,7 @@ function UserDashboard({ active, onReviewerAccessChange }: { active: string; onR
   const [authError, setAuthError] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [authMode, setAuthMode] = useState<'login' | 'register'>(() => window.location.pathname.replace(/\/$/, '') === '/register' ? 'register' : 'login');
   const [fullName, setFullName] = useState('');
   const [passwordConfirmation, setPasswordConfirmation] = useState('');
   const [selectedBusinessId, setSelectedBusinessId] = useState('');
