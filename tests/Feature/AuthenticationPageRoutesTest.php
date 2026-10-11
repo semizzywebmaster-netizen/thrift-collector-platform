@@ -1,11 +1,11 @@
 <?php
 
-namespace Tests\\Feature;
+namespace Tests\Feature;
 
-use Illuminate\\Http\\Request;
-use Illuminate\\Routing\\Route as RoutingRoute;
-use Illuminate\\Support\\Facades\\Route;
-use Tests\\TestCase;
+use Illuminate\Http\Request;
+use Illuminate\Routing\Route as RoutingRoute;
+use Illuminate\Support\Facades\Route;
+use Tests\TestCase;
 
 class AuthenticationPageRoutesTest extends TestCase
 {
