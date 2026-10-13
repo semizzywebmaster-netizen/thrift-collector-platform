@@ -142,6 +142,8 @@ final class ApiAuthenticationTest extends TestCase
         $user->refresh();
         self::assertSame(0, (int) $user->failed_login_attempts);
         self::assertNull($user->login_locked_until);
+        // Keep the production IP throttle intact while allowing the post-reset login assertion.
+        $this->travel(61)->seconds();
         $this->postJson('/api/v1/auth/login', ['email' => $user->email, 'password' => 'a-new-strong-password'])
             ->assertOk()->assertJsonPath('token_type', 'Bearer');
     }
