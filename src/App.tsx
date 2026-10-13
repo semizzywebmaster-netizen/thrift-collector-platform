@@ -70,7 +70,7 @@ export default function App() {
       <aside className={`sidebar ${menuOpen ? 'sidebar-open' : ''}`} aria-label="Main navigation">
         <div className="brand">
           <div className="brand-mark"><Wallet size={21} strokeWidth={2.4} /></div>
-          <div><strong>Thrift<span>Collect</span></strong><small>TRUSTED GROUP SAVINGS</small></div>
+          <div><strong>Semizzy<span> Thrift</span></strong><small>SEMIZZY THRIFT • GROUP SAVINGS</small></div>
           <button className="icon-button mobile-close" aria-label="Close menu" onClick={() => setMenuOpen(false)}><X size={20} /></button>
         </div>
         <div className="workspace-label">{page === 'admin' ? 'PLATFORM ADMIN' : 'YOUR WORKSPACE'}</div>
@@ -104,7 +104,7 @@ export default function App() {
 
         <div className="page-content">
           {page === 'admin' ? <AdminDashboard active={active} /> : <UserDashboard active={active} onReviewerAccessChange={setCanReviewDeposits} />}
-          <footer className="footer"><span>© {new Date().getFullYear()} Thrift Collector Platform</span><span>Built for clarity, trust and accountability</span></footer>
+          <footer className="footer"><span>© {new Date().getFullYear()} Semizzy Thrift</span><span>Built for clarity, trust and accountability</span></footer>
         </div>
         <nav className="mobile-tabs" aria-label="Quick navigation">
           {(page === 'admin' ? adminNav.slice(0, 4) : userNav.slice(0, 4)).map(({ label, icon: Icon }) => (
@@ -144,6 +144,14 @@ type PendingAccountDiagnostic = { id: number; bank_name: string; bank_code: stri
 type ProviderDeposit = { id: number; provider: string; provider_transaction_id: string; provider_reference: string | null; amount_minor: number; currency_code: string; status: string; occurred_at: string | null; created_at: string; user_id: number | null; account?: { bank_name?: string; account_name_ciphertext?: string | null } | null; safe_metadata?: { channel?: string; account_matched?: boolean } | null };
 type DashboardSummary = { user: DashboardProfile; active_workspaces_count: number; workspaces: Array<{ id: number; name: string; country_code: string; status: string; role: string }>; active_groups_count: number; groups: Array<{ id: number; business_id: number; name: string; description: string | null; currency_code: string; status: string; role: string; joined_at: string | null }>; confirmed_contribution_totals: Array<{ currency_code: string; total_minor: number; records_count: number }>; recent_contributions: Array<{ id: number; thrift_group_id: number; user_id: number; amount_minor: number; currency_code: string; status: string; collection_method: string; reference: string | null; created_at: string; confirmed_at: string | null; group: { id: number; name: string; currency_code: string } | null }>; upcoming_obligations_count: number; upcoming_obligations: Array<{ id: number; status: string; expected_amount_minor: number; currency_code: string; due_on: string | null; group: { id: number; name: string } | null }>; financial_data_status: string; message: string };
 
+function UserDashboard({ active, onReviewerAccessChange }: { active: string; onReviewerAccessChange: (allowed: boolean) => void }) {
+  const [token, setToken] = useState(() => sessionStorage.getItem('tcp_access_token') ?? '');
+  const [profile, setProfile] = useState<DashboardProfile | null>(null);
+  const [dashboardData, setDashboardData] = useState<DashboardSummary | null>(null);
+  const [authLoading, setAuthLoading] = useState(Boolean(token));
+  const [authError, setAuthError] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 function SecuritySettingsPanel() {
   const [hours, setHours] = useState('1');
   const [reason, setReason] = useState('');
@@ -219,14 +227,9 @@ function SecuritySettingsPanel() {
   </section>;
 }
 
-function UserDashboard({ active, onReviewerAccessChange }: { active: string; onReviewerAccessChange: (allowed: boolean) => void }) {
-  const [token, setToken] = useState(() => sessionStorage.getItem('tcp_access_token') ?? '');
-  const [profile, setProfile] = useState<DashboardProfile | null>(null);
-  const [dashboardData, setDashboardData] = useState<DashboardSummary | null>(null);
-  const [authLoading, setAuthLoading] = useState(Boolean(token));
-  const [authError, setAuthError] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [authMode, setAuthMode] = useState<'login' | 'register'>(() => window.location.pathname.replace(/\/$/, '') === '/register' ? 'register' : 'login');
+  const [fullName, setFullName] = useState('');
+  const [passwordConfirmation, setPasswordConfirmation] = useState('');
   const [selectedBusinessId, setSelectedBusinessId] = useState('');
   const [depositAccounts, setDepositAccounts] = useState<DepositAccount[]>([]);
   const [depositBanks, setDepositBanks] = useState<DepositBank[]>([]);
@@ -586,14 +589,34 @@ function UserDashboard({ active, onReviewerAccessChange }: { active: string; onR
     try {
       const response = await fetch('/api/v1/auth/login', {
         method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: email.trim(), password }),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.message ?? result.errors?.email?.[0] ?? 'Sign in failed. Check your details and try again.');
+      if (!response.ok) throw new Error(result.message ?? result.errors?.email?.[0] ?? result.errors?.password?.[0] ?? 'Sign in failed. Check your details and try again.');
       sessionStorage.setItem('tcp_access_token', result.access_token);
       setToken(result.access_token); setPassword('');
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : 'Sign in failed.'); setAuthLoading(false);
+    }
+  }
+
+  async function register(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); setAuthError('');
+    if (password.length < 12) { setAuthError('Use a password with at least 12 characters.'); return; }
+    if (password !== passwordConfirmation) { setAuthError('Your passwords do not match.'); return; }
+    setAuthLoading(true);
+    try {
+      const response = await fetch('/api/v1/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ name: fullName.trim(), email: email.trim(), password, password_confirmation: passwordConfirmation }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message ?? result.errors?.name?.[0] ?? result.errors?.email?.[0] ?? result.errors?.password?.[0] ?? 'Could not create your account. Check the details and try again.');
+      sessionStorage.setItem('tcp_access_token', result.access_token);
+      setToken(result.access_token); setPassword(''); setPasswordConfirmation('');
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Could not create your account.'); setAuthLoading(false);
     }
   }
 
@@ -605,14 +628,19 @@ function UserDashboard({ active, onReviewerAccessChange }: { active: string; onR
   }
 
   if (!token) return <section className="auth-gate"><div className="auth-card">
-    <div className="brand-mark auth-brand"><Wallet size={22} /></div><div className="eyebrow">MEMBER ACCESS</div><h1>Welcome back.</h1>
-    <p>Sign in to load your account details from the authenticated platform API.</p>
-    <form className="auth-form" onSubmit={signIn}>
-      <label htmlFor="member-email">Email address</label><input id="member-email" type="email" autoComplete="email" required value={email} onChange={event => setEmail(event.target.value)} />
-      <label htmlFor="member-password">Password</label><input id="member-password" type="password" autoComplete="current-password" required value={password} onChange={event => setPassword(event.target.value)} />
+    <div className="brand-mark auth-brand"><Wallet size={22} /></div><div className="eyebrow">MEMBER ACCESS</div>
+    <h1>{authMode === 'register' ? 'Create your account.' : 'Welcome back.'}</h1>
+    <p>{authMode === 'register' ? 'Join Thrift Collector to manage your savings groups and contributions.' : 'Sign in to load your account details from the authenticated platform API.'}</p>
+    <form className="auth-form" onSubmit={authMode === 'register' ? register : signIn}>
+      {authMode === 'register' && <><label htmlFor="member-name">Full name</label><input id="member-name" type="text" autoComplete="name" minLength={2} maxLength={120} required value={fullName} onChange={event => setFullName(event.target.value)} /></>}
+      <label htmlFor="member-email">Email address</label><input id="member-email" type="email" autoComplete="email" maxLength={254} required value={email} onChange={event => setEmail(event.target.value)} />
+      <label htmlFor="member-password">Password</label><input id="member-password" type="password" autoComplete={authMode === 'register' ? 'new-password' : 'current-password'} minLength={authMode === 'register' ? 12 : undefined} maxLength={200} required value={password} onChange={event => setPassword(event.target.value)} />
+      {authMode === 'register' && <><label htmlFor="member-password-confirmation">Confirm password</label><input id="member-password-confirmation" type="password" autoComplete="new-password" minLength={12} maxLength={200} required value={passwordConfirmation} onChange={event => setPasswordConfirmation(event.target.value)} /></>}
       {authError && <p className="auth-error" role="alert">{authError}</p>}
-      <button className="button button-primary auth-submit" type="submit" disabled={authLoading}>{authLoading ? 'Signing in…' : 'Sign in securely'} <ArrowRight size={16} /></button>
-    </form><p className="auth-footnote">Registration and email verification use the platform's existing API endpoints.</p>
+      <button className="button button-primary auth-submit" type="submit" disabled={authLoading}>{authLoading ? (authMode === 'register' ? 'Creating account…' : 'Signing in…') : (authMode === 'register' ? 'Create account securely' : 'Sign in securely')} <ArrowRight size={16} /></button>
+    </form>
+    <p className="auth-footnote">{authMode === 'register' ? 'We will send an email verification link. Use an email address you can access.' : 'Your account details are loaded securely from the platform API.'}</p>
+    <p className="auth-footnote">{authMode === 'register' ? 'Already have an account? ' : 'New to Thrift Collector? '}<button type="button" className="text-button" onClick={() => { setAuthMode(mode => mode === 'login' ? 'register' : 'login'); setAuthError(''); setPassword(''); setPasswordConfirmation(''); }}>{authMode === 'register' ? 'Sign in' : 'Create an account'}</button></p>
   </div></section>;
   if (authLoading && !profile) return <section className="auth-gate"><div className="auth-card"><strong>Loading your account…</strong><p>Checking your authenticated session.</p></div></section>;
   if (authError && !profile) return <section className="auth-gate"><div className="auth-card"><h1>Session needs attention</h1><p>{authError}</p><button className="button button-primary" onClick={signOut}>Return to sign in</button></div></section>;
