@@ -66,7 +66,7 @@ return new class extends Migration {
         Schema::create('payment_operation_events', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('business_id')->constrained('businesses')->restrictOnDelete();
-            $table->string('operation_type', 24);
+            $table->string('operation_type', 40);
             $table->unsignedBigInteger('operation_id');
             $table->foreignId('actor_user_id')->constrained('users')->restrictOnDelete();
             $table->string('event', 40);
