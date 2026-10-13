@@ -152,6 +152,81 @@ function UserDashboard({ active, onReviewerAccessChange }: { active: string; onR
   const [authError, setAuthError] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+function SecuritySettingsPanel() {
+  const [hours, setHours] = useState('1');
+  const [reason, setReason] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    const token = sessionStorage.getItem('tcp_access_token') ?? '';
+    if (!token) {
+      setError('Sign in with an authorized platform administrator account.');
+      setLoading(false);
+      return () => { cancelled = true; };
+    }
+    fetch('/api/v1/admin/security-settings', {
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+    }).then(async response => {
+      if (!response.ok) throw new Error(response.status === 403
+        ? 'This account needs the platform.security.manage permission.'
+        : 'Could not load security settings.');
+      return response.json() as Promise<{ data: { login_lockout_hours: number } }>;
+    }).then(result => {
+      if (!cancelled) setHours(String(result.data.login_lockout_hours));
+    }).catch(cause => {
+      if (!cancelled) setError(cause instanceof Error ? cause.message : 'Could not load security settings.');
+    }).finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  async function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    setMessage('');
+    setError('');
+    const token = sessionStorage.getItem('tcp_access_token') ?? '';
+    try {
+      const response = await fetch('/api/v1/admin/security-settings', {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ login_lockout_hours: Number(hours), reason }),
+      });
+      const result = await response.json() as { message?: string; errors?: Record<string, string[]> };
+      if (!response.ok) throw new Error(result.message ?? Object.values(result.errors ?? {}).flat()[0] ?? 'Could not save security settings.');
+      setMessage(result.message ?? 'Security settings saved and audited.');
+      setReason('');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not save security settings.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return <section className="panel">
+    <div className="panel-heading"><div><h2>Account security policy</h2><p>Admin-controlled lockout policy. Changes are recorded in the platform audit log.</p></div></div>
+    {loading ? <p className="muted">Loading security settings…</p> : <>
+      {error && <div className="inline-alert inline-alert-error" role="alert">{error}</div>}
+      {message && <div className="inline-alert inline-alert-success" role="status">{message}</div>}
+      <div className="security-policy-grid">
+        <article className="security-policy-item"><strong>Failed password logins</strong><p>Account locks after 3 consecutive failures. A password reset clears the lock immediately.</p></article>
+        <article className="security-policy-item"><strong>Transaction PIN failures</strong><p>Transactions lock after 3 incorrect PINs for 15 minutes.</p></article>
+      </div>
+      <form className="security-settings-form" onSubmit={save}>
+        <label htmlFor="login-lockout-hours">Password login lockout duration (hours)</label>
+        <input id="login-lockout-hours" type="number" min="1" max="720" required value={hours} onChange={event => setHours(event.target.value)} />
+        <small>Allowed range: 1–720 hours. Existing active locks keep their current expiry.</small>
+        <label htmlFor="security-change-reason">Reason for change</label>
+        <textarea id="security-change-reason" required minLength={8} maxLength={500} value={reason} onChange={event => setReason(event.target.value)} placeholder="Explain why this security policy is changing." />
+        <button className="button button-primary" type="submit" disabled={saving || !reason.trim() || Number(hours) < 1 || Number(hours) > 720}>{saving ? 'Saving…' : 'Save security policy'} <ArrowRight size={16} /></button>
+      </form>
+    </>}
+  </section>;
+}
+
   const [authMode, setAuthMode] = useState<'login' | 'register'>(() => window.location.pathname.replace(/\/$/, '') === '/register' ? 'register' : 'login');
   const [fullName, setFullName] = useState('');
   const [passwordConfirmation, setPasswordConfirmation] = useState('');
@@ -794,7 +869,8 @@ function AdminDashboard({ active }: { active: string }) {
 
   return <>
     <SectionHeading eyebrow="PLATFORM ADMINISTRATION" title={active === 'Overview' ? 'Operations overview.' : active} description="Protected, read-only operational data from the authenticated platform API." />
-    <div className="preview-warning"><ShieldCheck size={19} /><div><strong>Read-only administration</strong><p>{data?.message ?? 'No financial execution, ledger posting, payouts, or provider settlement actions are exposed in this dashboard.'}</p></div></div>
+    <div className="preview-warning"><ShieldCheck size={19} /><div><strong>Protected administration</strong><p>{data?.message ?? 'Financial execution, ledger posting, payouts, and provider settlement remain disabled. Security policy changes require a dedicated permission and are audited.'}</p></div></div>
+    {active === 'Settings' && <SecuritySettingsPanel />}
     {loading ? <section className="panel"><EmptyPanel icon={Activity} title="Loading protected data" body="Checking your platform permissions and retrieving current operational counts." /></section>
       : error ? <section className="panel"><EmptyPanel icon={ShieldCheck} title="Admin data unavailable" body={error} /></section>
       : data ? <>
