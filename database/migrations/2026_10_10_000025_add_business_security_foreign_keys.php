@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
@@ -49,6 +50,11 @@ return new class extends Migration {
 
     public function down(): void
     {
+        // SQLite cannot drop foreign keys by name; its test teardown drops the tables afterward.
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
+
         $hasForeignKey = static function (string $tableName, string $columnName, string $referencedTable): bool {
             return collect(Schema::getForeignKeys($tableName))->contains(
                 static fn (array $foreignKey): bool =>
